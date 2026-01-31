@@ -8,6 +8,7 @@ const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
+import { Toaster } from "react-hot-toast";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -34,7 +35,7 @@ export default function RootLayout({
 
           <Footer />
 
-          {/* <Toaster /> */}
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>

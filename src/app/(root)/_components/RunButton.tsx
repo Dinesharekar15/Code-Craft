@@ -13,8 +13,9 @@ function RunButton() {
   const saveExecution = useMutation(api.codeExecutions.saveExecution);
 
   const handleRun = async () => {
+      
     await runCode();
-    const result = getExecutionResult();
+    const result = getExecutionResult();  
 
     if (user && result) {
       await saveExecution({
