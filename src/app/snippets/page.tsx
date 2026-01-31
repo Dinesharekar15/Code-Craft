@@ -40,7 +40,7 @@ function SnippetsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="min-h-screen  bg-[#0a0a0f]">
       <NavigationHeader />
 
       <div className="relative max-w-7xl mx-auto px-4 py-12">

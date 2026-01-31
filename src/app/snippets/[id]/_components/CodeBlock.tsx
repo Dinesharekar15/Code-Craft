@@ -1,4 +1,5 @@
-
+import {Light as SyntaxHighlighter} from "react-syntax-highlighter";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import CopyButton from "./CopyButton";
 
 const CodeBlock = ({ language, code }: { language: string; code: string }) => {
@@ -24,14 +25,14 @@ const CodeBlock = ({ language, code }: { language: string; code: string }) => {
       <div className="relative">
         <SyntaxHighlighter
           language={language || "plaintext"}
-          style={atomOneDark} // dark theme for the code
+          style={atomOneDark}
           customStyle={{
             padding: "1rem",
             background: "transparent",
             margin: 0,
           }}
           showLineNumbers={true}
-          wrapLines={true} // wrap long lines
+          wrapLines={true}
         >
           {trimmedCode}
         </SyntaxHighlighter>
