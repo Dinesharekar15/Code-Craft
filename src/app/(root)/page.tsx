@@ -7,7 +7,7 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-b from-[#0C1321] to-[#0A0F1D]">
       <div className="max-w-450 mx-auto p-4">
         <Header />
-        <div> dinesh </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <EditorPanel />
           <OutputPanel />
