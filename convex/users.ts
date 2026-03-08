@@ -41,3 +41,25 @@ export const getUser = query({
     return user;
   },
 });
+
+export const upgradeToPro = mutation({
+  args: {
+    userId: v.string(),
+    upiTransactionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user_id")
+      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .first();
+
+    if (!user) throw new Error("User not found");
+
+    await ctx.db.patch(user._id, {
+      isPro: true,
+      proSince: Date.now(),
+      upiTransactionId: args.upiTransactionId,
+    });
+  },
+});

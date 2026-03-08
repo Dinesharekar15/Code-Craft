@@ -10,6 +10,7 @@ export default defineSchema({
     proSince: v.optional(v.number()),
     lemonSqueezyCustomerId: v.optional(v.string()),
     lemonSqueezyOrderId: v.optional(v.string()),
+    upiTransactionId: v.optional(v.string()),
   }).index("by_user_id", ["userId"]),
 
   codeExecutions: defineTable({
@@ -42,4 +43,17 @@ export default defineSchema({
     .index("by_user_id", ["userId"])
     .index("by_snippet_id", ["snippetId"])
     .index("by_user_id_and_snippet_id", ["userId", "snippetId"]),
+
+  paymentRequests: defineTable({
+    userId: v.string(),
+    userName: v.string(),
+    email: v.string(),
+    transactionId: v.string(),
+    amount: v.number(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected")),
+    reviewedAt: v.optional(v.number()),
+    rejectionReason: v.optional(v.string()),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_status", ["status"]),
 });

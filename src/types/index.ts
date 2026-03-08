@@ -22,13 +22,14 @@ export interface LanguageRuntime {
 }
 
 export interface ExecuteCodeResponse {
-  compile?: {
-    output: string;
+  status: {
+    id: number;       // 3 = Accepted, 6 = Compile Error, others = runtime/TLE errors
+    description: string;
   };
-  run?: {
-    output: string;
-    stderr: string;
-  };
+  stdout: string | null;
+  stderr: string | null;
+  compile_output: string | null;
+  message: string | null;
 }
 
 export interface ExecutionResult {
