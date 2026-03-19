@@ -255,6 +255,52 @@ int main() {
     return 0;
 }`,
   },
+  c: {
+    id: "c",
+    label: "C",
+    logoPath: "/c.png",
+    judge0Id: 50, // C (GCC 9.2.0)
+    monacoLanguage: "c",
+    defaultCode: `#include <stdio.h>
+
+int main() {
+    // Create array
+    int numbers[] = {1, 2, 3, 4, 5};
+    int n = sizeof(numbers) / sizeof(numbers[0]);
+    
+    // Print original numbers
+    printf("Original numbers: ");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", numbers[i]);
+    }
+    printf("\\n");
+    
+    // Calculate and print squares
+    printf("Squared numbers: ");
+    for (int i = 0; i < n; i++) {
+        printf("%d ", numbers[i] * numbers[i]);
+    }
+    printf("\\n");
+    
+    // Filter even numbers
+    printf("Even numbers: ");
+    for (int i = 0; i < n; i++) {
+        if (numbers[i] % 2 == 0) {
+            printf("%d ", numbers[i]);
+        }
+    }
+    printf("\\n");
+    
+    // Calculate sum
+    int sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += numbers[i];
+    }
+    printf("Sum of numbers: %d\\n", sum);
+    
+    return 0;
+}`,
+  },
   csharp: {
     id: "csharp",
     label: "C#",

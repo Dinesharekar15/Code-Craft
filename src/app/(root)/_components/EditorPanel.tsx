@@ -1,20 +1,27 @@
 "use client";
-import { useCodeEditorStore } from "@/src/store/useCodeEditorStore";
+import { useCodeEditorStore, getExecutionResult } from "@/src/store/useCodeEditorStore";
 import { useEffect, useState } from "react";
 import { defineMonacoThemes, LANGUAGE_CONFIG } from "../_constants";
 import { Editor } from "@monaco-editor/react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { RotateCcwIcon, ShareIcon, TypeIcon } from "lucide-react";
-import { useClerk } from "@clerk/nextjs";
-import  {EditorPanelSkeleton}  from "./EditorPanelSkeleton";
+import { RotateCcwIcon, ShareIcon, TypeIcon, SaveIcon } from "lucide-react";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { EditorPanelSkeleton } from "./EditorPanelSkeleton";
 import useMounted from "@/src/hooks/useMounted";
 import ShareSnippetDialog from "./ShareSnippetDialog";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import toast from "react-hot-toast";
 
 function EditorPanel() {
   const clerk = useClerk();
+  const { user } = useUser();
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const { language, theme, fontSize, editor, setFontSize, setEditor } = useCodeEditorStore();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const saveExecution = useMutation(api.codeExecutions.saveExecution);
 
   const mounted = useMounted();
 
@@ -43,6 +50,36 @@ function EditorPanel() {
     const size = Math.min(Math.max(newSize, 12), 24);
     setFontSize(size);
     localStorage.setItem("editor-font-size", size.toString());
+  };
+
+  const handleSave = async () => {
+    const result = getExecutionResult();
+
+    if (!result) {
+      toast.error("Please run your code before saving it.");
+      return;
+    }
+
+    if (!user) {
+      toast.error("You must be logged in to save executions.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveExecution({
+        language,
+        code: result.code,
+        output: result.output || undefined,
+        error: result.error || undefined,
+      });
+      toast.success("Execution saved to profile!");
+    } catch (error) {
+      toast.error("Failed to save execution.");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!mounted) return null;
@@ -88,6 +125,18 @@ function EditorPanel() {
               aria-label="Reset to default code"
             >
               <RotateCcwIcon className="size-4 text-gray-400" />
+            </motion.button>
+
+            {/* Save Button */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleSave}
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg overflow-hidden bg-[#1e1e2e] hover:bg-[#2a2a3a] ring-1 ring-white/5 transition-opacity disabled:opacity-50"
+            >
+              <SaveIcon className={`size-4 text-gray-400 ${isSaving ? 'animate-pulse' : ''}`} />
+              <span className="text-sm font-medium text-gray-400">Save</span>
             </motion.button>
 
             {/* Share Button */}
