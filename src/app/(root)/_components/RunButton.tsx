@@ -1,6 +1,6 @@
 "use client";
 
-import { useCodeEditorStore, getExecutionResult } from "@/src/store/useCodeEditorStore";
+import { useCodeEditorStore } from "@/src/store/useCodeEditorStore";
 import { useUser } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
 import { motion } from "framer-motion";

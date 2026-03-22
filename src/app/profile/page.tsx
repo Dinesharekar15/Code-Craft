@@ -2,7 +2,7 @@
 import { useUser } from "@clerk/nextjs";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 import NavigationHeader from "@/src/components/NavigationHeader";
 import ProfileHeader from "./_components/ProfileHeader";
@@ -57,7 +57,9 @@ function ProfilePage() {
     if (executionStatus === "CanLoadMore") loadMore(5);
   };
 
-  if (!user && isLoaded) return router.push("/");
+  useEffect(() => {
+    if (!user && isLoaded) router.push("/");
+  }, [user, isLoaded, router]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">

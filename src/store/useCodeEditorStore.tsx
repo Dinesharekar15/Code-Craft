@@ -118,8 +118,6 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
           return;
         }
 
-        console.log("Judge0 response:", response.status, data);
-
         const statusId: number | undefined = data?.status?.id;
         const statusDesc: string = data?.status?.description ?? "";
         const compileOutput = extractClean(b64decode(data?.compile_output));
