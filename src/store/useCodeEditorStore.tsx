@@ -4,26 +4,22 @@ import { create } from "zustand";
 import { Monaco } from "@monaco-editor/react";
 
 const getInitialState = () => {
-  // if we're on the server, return default values
   if (typeof window === "undefined") {
-    return {
-      language: "javascript",
-      fontSize: 16,
-      theme: "vs-dark",
-    };
+    return { language: "javascript", fontSize: 16, theme: "vs-dark" };
   }
-
-  // if we're on the client, return values from local storage bc localStorage is a browser API.
   const savedLanguage = localStorage.getItem("editor-language") || "javascript";
   const savedTheme = localStorage.getItem("editor-theme") || "vs-dark";
   const savedFontSize = localStorage.getItem("editor-font-size") || 16;
-
-  return {
-    language: savedLanguage,
-    theme: savedTheme,
-    fontSize: Number(savedFontSize),
-  };
+  return { language: savedLanguage, theme: savedTheme, fontSize: Number(savedFontSize) };
 };
+
+// Strip noisy sandbox lines like "Exited with error status 1"
+const extractClean = (raw: string | null | undefined): string =>
+  (raw || "")
+    .split("\n")
+    .filter((line) => !/^Exited with (error )?status \d+/.test(line.trim()))
+    .join("\n")
+    .trim();
 
 export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
   const initialState = getInitialState();
@@ -33,15 +29,17 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
     output: "",
     isRunning: false,
     error: null,
+    stdin: "",
     editor: null,
     executionResult: null,
 
     getCode: () => get().editor?.getValue() || "",
 
+    setStdin: (stdin: string) => set({ stdin }),
+
     setEditor: (editor: Monaco) => {
       const savedCode = localStorage.getItem(`editor-code-${get().language}`);
       if (savedCode) editor.setValue(savedCode);
-
       set({ editor });
     },
 
@@ -56,23 +54,16 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
     },
 
     setLanguage: (language: string) => {
-      // Save current language code before switching
       const currentCode = get().editor?.getValue();
       if (currentCode) {
         localStorage.setItem(`editor-code-${get().language}`, currentCode);
       }
-
       localStorage.setItem("editor-language", language);
-
-      set({
-        language,
-        output: "",
-        error: null,
-      });
+      set({ language, output: "", error: null, stdin: "" });
     },
 
     runCode: async () => {
-      const { language, getCode } = get();
+      const { language, getCode, stdin } = get();
       const code = getCode();
 
       if (!code) {
@@ -86,8 +77,10 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
         const judge0Id = LANGUAGE_CONFIG[language].judge0Id;
         const apiKey = process.env.NEXT_PUBLIC_JUDGE0_API_KEY;
 
+        // Use base64_encoded=true — GCC error output contains non-UTF-8 chars
+        // (ANSI escape codes) which cause Judge0 to return 400 with base64_encoded=false
         const response = await fetch(
-          "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true",
+          "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true",
           {
             method: "POST",
             headers: {
@@ -97,88 +90,78 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
             },
             body: JSON.stringify({
               language_id: judge0Id,
-              source_code: code,
+              source_code: btoa(unescape(encodeURIComponent(code))),
+              stdin: stdin ? btoa(unescape(encodeURIComponent(stdin))) : "",
             }),
           }
         );
 
-        const data = await response.json();
+        // Helper: safely base64-decode a field from the response
+        const b64decode = (s: string | null | undefined): string => {
+          if (!s) return "";
+          try {
+            return decodeURIComponent(escape(atob(s)));
+          } catch (_) {
+            return s; // fallback: return as-is if not valid base64
+          }
+        };
 
-        console.log("data back from judge0:", data);
-
-        // Handle API-level errors (e.g. missing/invalid API key)
-        // NOTE: data.message is NOT an API error — Judge0 uses it to note non-zero exits.
-        // Only treat HTTP non-200 as an API-level failure.
-        if (!response.ok) {
-          const errMsg = data.message || `API error: ${response.status}`;
+        // Always parse the body — even on HTTP errors the body may have compile_output
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let data: Record<string, any> = {};
+        try {
+          data = await response.json();
+        } catch (_) {
+          // body is not JSON (network failure, etc.)
+          const errMsg = `API error: ${response.status}`;
           set({ error: errMsg, executionResult: { code, output: "", error: errMsg } });
           return;
         }
 
-        // Helper: strip generic "Exited with error status N" lines that Judge0 sandbox adds
-        const extractError = (raw: string | null) =>
-          (raw || "")
-            .split("\n")
-            .filter((line) => !/^Exited with (error )?status \d+/.test(line.trim()))
-            .join("\n")
-            .trim();
+        console.log("Judge0 response:", response.status, data);
 
-        // status.id === 6 means Compilation Error
-        if (data.status?.id === 6) {
-          const error =
-            extractError(data.compile_output) ||
-            extractError(data.stderr) ||
-            "Compilation error";
-          set({
-            error,
-            executionResult: { code, output: "", error },
-          });
+        const statusId: number | undefined = data?.status?.id;
+        const statusDesc: string = data?.status?.description ?? "";
+        const compileOutput = extractClean(b64decode(data?.compile_output));
+        const stderr = extractClean(b64decode(data?.stderr));
+        const stdout = extractClean(b64decode(data?.stdout));
+
+        // ── 1. Compile Error (status 6 OR compile_output present with no stdout)
+        //    Note: RapidAPI sometimes returns HTTP 4xx but still populates compile_output
+        if (statusId === 6 || (compileOutput && !data?.stdout)) {
+          const error = compileOutput || stderr || "Compilation error";
+          set({ error, executionResult: { code, output: "", error } });
           return;
         }
 
-        // status.id === 3 means Accepted (successful execution)
-        if (data.status?.id === 3) {
-          const output = data.stdout || "";
+        // ── 2. Pure API failure with no executable content (HTTP error, no useful output)
+        if (!response.ok && !stderr && !compileOutput && !stdout) {
+          const errMsg = data?.message || `API error: ${response.status}`;
+          set({ error: errMsg, executionResult: { code, output: "", error: errMsg } });
+          return;
+        }
+
+        // ── 3. Accepted
+        if (statusId === 3) {
           set({
-            output: output.trim(),
+            output: stdout.trim(),
             error: null,
-            executionResult: {
-              code,
-              output: output.trim(),
-              error: null,
-            },
+            executionResult: { code, output: stdout.trim(), error: null },
           });
           return;
         }
 
-        // All other statuses = runtime errors (NZEC, TLE, SIGSEGV, etc.)
-        // Judge0 CE on RapidAPI puts the actual error trace in stderr.
-        // Some configurations also echo it to stdout. We combine both.
-        const stderrClean = extractError(data.stderr);
-        const stdoutClean = extractError(data.stdout);
-        const compileClean = extractError(data.compile_output);
-
-        const errorBody =
-          stderrClean ||
-          compileClean ||
-          stdoutClean || // fallback: some JS/Python errors end up in stdout
-          "";
-
-        const statusLabel = data.status?.description
-          ? `[${data.status.description}]\n`
-          : "";
-
+        // ── 4. Runtime / TLE / SIGSEGV / NZEC / other errors
+        const errorBody = stderr || compileOutput || stdout || "";
+        const statusLabel = statusDesc ? `[${statusDesc}]\n` : "";
         const error = errorBody
           ? `${statusLabel}${errorBody}`
-          : `${data.status?.description || "Runtime error"}`;
+          : statusDesc || "Runtime error";
 
-        set({
-          error,
-          executionResult: { code, output: "", error },
-        });
-        return;
-      } catch (error) {
-        console.log("Error running code:", error);
+        set({ error, executionResult: { code, output: "", error } });
+
+      } catch (err) {
+        console.log("Error running code:", err);
         set({
           error: "Error running code",
           executionResult: { code, output: "", error: "Error running code" },

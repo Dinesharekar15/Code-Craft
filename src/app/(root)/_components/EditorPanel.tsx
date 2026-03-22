@@ -1,11 +1,11 @@
 "use client";
 import { useCodeEditorStore, getExecutionResult } from "@/src/store/useCodeEditorStore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { defineMonacoThemes, LANGUAGE_CONFIG } from "../_constants";
 import { Editor } from "@monaco-editor/react";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { RotateCcwIcon, ShareIcon, TypeIcon, SaveIcon } from "lucide-react";
+import { RotateCcwIcon, ShareIcon, TypeIcon, SaveIcon, AlertTriangle } from "lucide-react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import { EditorPanelSkeleton } from "./EditorPanelSkeleton";
 import useMounted from "@/src/hooks/useMounted";
@@ -20,6 +20,19 @@ function EditorPanel() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const { language, theme, fontSize, editor, setFontSize, setEditor } = useCodeEditorStore();
   const [isSaving, setIsSaving] = useState(false);
+  const [showJavaWarning, setShowJavaWarning] = useState(false);
+
+  const checkJavaClassName = useCallback(
+    (code: string) => {
+      if (language !== "java") {
+        setShowJavaWarning(false);
+        return;
+      }
+      const hasMainClass = /public\s+class\s+Main\b/.test(code);
+      setShowJavaWarning(!hasMainClass);
+    },
+    [language]
+  );
 
   const saveExecution = useMutation(api.codeExecutions.saveExecution);
 
@@ -29,7 +42,8 @@ function EditorPanel() {
     const savedCode = localStorage.getItem(`editor-code-${language}`);
     const newCode = savedCode || LANGUAGE_CONFIG[language].defaultCode;
     if (editor) editor.setValue(newCode);
-  }, [language, editor]);
+    checkJavaClassName(newCode);
+  }, [language, editor, checkJavaClassName]);
 
   useEffect(() => {
     const savedFontSize = localStorage.getItem("editor-font-size");
@@ -43,7 +57,10 @@ function EditorPanel() {
   };
 
   const handleEditorChange = (value: string | undefined) => {
-    if (value) localStorage.setItem(`editor-code-${language}`, value);
+    if (value) {
+      localStorage.setItem(`editor-code-${language}`, value);
+      checkJavaClassName(value);
+    }
   };
 
   const handleFontSizeChange = (newSize: number) => {
@@ -189,6 +206,20 @@ function EditorPanel() {
 
           {!clerk.loaded && <EditorPanelSkeleton />}
         </div>
+
+        {/* Java class name warning */}
+        {showJavaWarning && (
+          <div className="mt-3 flex items-start gap-2 px-4 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>
+              Java requires the public class to be named{" "}
+              <code className="font-mono bg-amber-500/20 px-1 rounded">Main</code>
+              {" — rename your class to "}
+              <code className="font-mono bg-amber-500/20 px-1 rounded">public class Main</code>
+              {" or it will fail to compile."}
+            </span>
+          </div>
+        )}
       </div>
       {isShareDialogOpen && <ShareSnippetDialog onClose={() => setIsShareDialogOpen(false)} />}
     </div>
