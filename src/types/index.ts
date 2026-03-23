@@ -13,12 +13,6 @@ export interface Language {
   logoPath: string;
   monacoLanguage: string;
   defaultCode: string;
-  pistonRuntime: LanguageRuntime;
-}
-
-export interface LanguageRuntime {
-  language: string;
-  version: string;
 }
 
 export interface ExecuteCodeResponse {

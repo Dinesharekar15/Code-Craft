@@ -75,26 +75,17 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
 
       try {
         const judge0Id = LANGUAGE_CONFIG[language].judge0Id;
-        const apiKey = process.env.NEXT_PUBLIC_JUDGE0_API_KEY;
 
-        // Use base64_encoded=true — GCC error output contains non-UTF-8 chars
-        // (ANSI escape codes) which cause Judge0 to return 400 with base64_encoded=false
-        const response = await fetch(
-          "https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-RapidAPI-Key": apiKey || "",
-              "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
-            },
-            body: JSON.stringify({
-              language_id: judge0Id,
-              source_code: btoa(unescape(encodeURIComponent(code))),
-              stdin: stdin ? btoa(unescape(encodeURIComponent(stdin))) : "",
-            }),
-          }
-        );
+        // Route through server-side proxy so the API key never reaches the browser
+        const response = await fetch("/api/judge0", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            language_id: judge0Id,
+            source_code: btoa(unescape(encodeURIComponent(code))),
+            stdin: stdin ? btoa(unescape(encodeURIComponent(stdin))) : "",
+          }),
+        });
 
         // Helper: safely base64-decode a field from the response
         const b64decode = (s: string | null | undefined): string => {
